@@ -3,44 +3,19 @@
 # Хз зачем ты читаешь это... Ты думаешь тут будет важная информация... Возможно...
 # Это стартовый файл, обычно тут ничего нет... Ищи в других файлах!
 
-from typing import Union
-
-from fastapi import FastAPI
-from pydantic import BaseModel
 import sqlite3
+import time
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
+from src.BaseModels import User,Booking #Базовые модели
 import json
 app = FastAPI()
 
 # Создаем подключение к базе данных (файл my_database.db будет создан)
 connection = sqlite3.connect('database.db', check_same_thread=False)
-@app.on_event("shutdown")
-async def shutdown():
-    connection.close()
-
-
-# Модель данных пользователя
-class User(BaseModel):
-    name: str
-    password: str
-
-# Хранилище данных для пользователей (пример - список пользователей)
-users = []
-
-
-# Модель данных бронирования
-class Booking(BaseModel):
-    start: datetime
-    duration: int
-    comment: Optional[str] = None
-
-
-# Хранилище данных для бронирования (пример - список бронирований)
-bookings = []
 
 def executes(text):
     cursor = connection.cursor()
@@ -53,53 +28,59 @@ def fetchal(text):
     cursor.execute(text)
     results = cursor.fetchall()
     return results
+
+
 # Операция создания пользователя (Create)
 @app.post("/user/add", response_model=int)
 def create_user(user: User)->int:
-    executes(f"""
-    INSERT INTO User (username, password, created, updated)
-    VALUES ("{user.name}", "{user.password}", 0, 1);
-    """)
-    return fetchal(f"""
+    try:
+        executes(f"""
+        INSERT INTO User (username, password, created, updated)
+        VALUES ("{user.name}", "{user.password}", {time.time()}, {time.time()});
+        """)
+        return fetchal(f"""
+            SELECT *
+            FROM User
+            ORDER BY id DESC
+            LIMIT 1;
+            """)[0][0]  # Возвращаем индекс созданного пользователя
+    except:
+        raise HTTPException(status_code=409, detail="User already exists")
+
+# Операция проверки занятости имени пользователя (Read)
+@app.post("/user/checkname", response_model=bool)
+def check_username(username: str)->bool:
+    if len(fetchal(f"""
     SELECT *
     FROM User
-    ORDER BY id DESC
-    LIMIT 1;
-    """)[0][0]  # Возвращаем индекс созданного пользователя
-
-@app.post("/user/chekname", response_model=int)
-def create_user(user: User)->int:
-    executes(f"""
-    INSERT INTO User (username, password, created, updated)
-    VALUES ("{user.name}", "{user.password}", 0, 1);
-    """)
-    return fetchal(f"""
-    SELECT *
-    FROM User
-    ORDER BY id DESC
-    LIMIT 1;
-    """)[0][0]
-
+    WHERE username = '{username}'
+    """))==0:
+        return True
+    else:
+        raise HTTPException(status_code=409, detail="User already exists")
 
 # Операция получения имени и id пользователя (Read)
 @app.get("/user/get_id_name", response_model=int)
-def get_user_id_by_name(name: str):
-    id = fetchal(f"""
+def get_user_id_by_name(username: str):
+    try:
+        id = fetchal(f"""
         SELECT *
         FROM User
-        WHILE username LIKE '{name}'
+        WHERE username = '{username}'
         LIMIT 1;
         """)[0][0]
-    for i, user in enumerate(users):
-        if user.name == name:
-            return i
-    raise HTTPException(status_code=404, detail="User not found")
+        return id
+    except:
+        raise HTTPException(status_code=401, detail="User not found")
 
 
 # Операция получения всех пользователей (Read All)
 @app.get("/user/getall", response_model=List[User])
 def get_all_users():
-    return users
+    return fetchal(f"""
+        SELECT User
+        FROM users;
+        """)[0][0]
 
 
 # Операция удаления пользователя (Delete)
@@ -216,3 +197,6 @@ def update_user_booking(user: int, booking_id: int, booking: Booking, password: 
     else:
         return False
 
+@app.on_event("shutdown")
+async def shutdown():
+    connection.close()
