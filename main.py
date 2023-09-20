@@ -10,7 +10,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-from src.BaseModels import User,Booking #Базовые модели
+from src.BaseModels import User, Booking, Iser  # Базовые модели
 import json
 app = FastAPI()
 
@@ -29,23 +29,16 @@ def fetchal(text):
     results = cursor.fetchall()
     return results
 
+users = []
 
 # Операция создания пользователя (Create)
 @app.post("/user/add", response_model=int)
 def create_user(user: User)->int:
-    try:
-        executes(f"""
-        INSERT INTO User (username, password, created, updated)
-        VALUES ("{user.name}", "{user.password}", {time.time()}, {time.time()});
-        """)
-        return fetchal(f"""
-            SELECT *
-            FROM User
-            ORDER BY id DESC
-            LIMIT 1;
-            """)[0][0]  # Возвращаем индекс созданного пользователя
-    except:
-        raise HTTPException(status_code=409, detail="User already exists")
+        if len(fetchal(f"SELECT * FROM User WHERE username = '{user.name}'"))==0:
+            executes(f"INSERT INTO User (username, password, created, updated) VALUES ('{user.name}', '{user.password}', {time.time()}, {time.time()});")
+            return fetchal(f"SELECT * FROM User ORDER BY id DESC LIMIT 1;")[0][0]  # Возвращаем индекс созданного пользователя
+        else:
+            raise HTTPException(status_code=409, detail="User already exists")
 
 # Операция проверки занятости имени пользователя (Read)
 @app.post("/user/checkname", response_model=bool)
@@ -60,7 +53,7 @@ def check_username(username: str)->bool:
         raise HTTPException(status_code=409, detail="User already exists")
 
 # Операция получения имени и id пользователя (Read)
-@app.get("/user/get_id_name", response_model=int)
+@app.post("/user/getname", response_model=int)
 def get_user_id_by_name(username: str):
     try:
         id = fetchal(f"""
@@ -73,30 +66,25 @@ def get_user_id_by_name(username: str):
     except:
         raise HTTPException(status_code=401, detail="User not found")
 
-
 # Операция получения всех пользователей (Read All)
-@app.get("/user/getall", response_model=List[User])
+@app.get("/user/getall", response_model=List[tuple])
 def get_all_users():
     return fetchal(f"""
-        SELECT User
-        FROM users;
-        """)[0][0]
+        SELECT username,id
+        FROM User;
+        """)
 
+# Операция удаления пользователя (Delete) Хз можно ли, так делать... Но это удаление...
+@app.delete("/user/{user_id}/{password}/del", response_model=bool)
+def delete_user(user_id:int,password: str):
+    if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'"))==0:
+        raise HTTPException(status_code=401, detail="User not found")
 
-# Операция удаления пользователя (Delete)
-@app.delete("/user/{user_id}/del", response_model=bool)
-def delete_user(user_id: int, password: str):
-    print(user_id,password)
-    if user_id < 0 or user_id >= len(users):
-        raise HTTPException(status_code=404, detail="User not found")
-
-    user = users[user_id]
-    if user.password == password:
-        users.pop(user_id)
+    if len(fetchal(f"SELECT * FROM User WHERE password = '{password}'")) == 1:
+        executes(f"DELETE FROM User WHERE id = {user_id}")
         return True
     else:
         return False
-
 
 # Операция получения времени регистрации пользователя (Read)
 @app.get("/user/{user_id}/get_reg_time", response_model=int)
