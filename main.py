@@ -10,7 +10,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
-from BaseModels import User, Booking, Iser  # Базовые модели
+from BaseModels import User, Booking, Iser, Booking_Id  # Базовые модели
+from fastapi.openapi.docs import get_swagger_ui_html
 
 import bcrypt
 
@@ -19,6 +20,10 @@ app = FastAPI()
 
 # Создаем подключение к базе данных (файл my_database.db будет создан)
 connection = sqlite3.connect('database.db', check_same_thread=False)
+
+@app.get("/docs")
+def read_docs():
+    return get_swagger_ui_html(openapi_url="/openapi.json")
 
 def executes(text):
     cursor = connection.cursor()
@@ -46,7 +51,9 @@ def hex(data:str):
 def create_user(user: User)->int:
     if len(fetchal(f"SELECT * FROM User WHERE username = '{user.name}'"))==0:
         executes(f"INSERT INTO User (username, password, created, updated) VALUES ('{user.name}', '{hex(user.password)}', {int(time.time())}, {int(time.time())});")
-        return fetchal(f"SELECT * FROM User ORDER BY id DESC LIMIT 1;")[0][0]  # Возвращаем индекс созданного пользователя
+        return fetchal(f"SELECT * "
+                       f"FROM User "
+                       f"WHERE username = {user.name} ;")[0][0]  # Возвращаем индекс созданного пользователя
     else:
         raise HTTPException(status_code=409, detail="User already exists")
 
@@ -92,6 +99,7 @@ def delete_user(user_id:int,password: str):
 
     if chekhex(password,fetchal(f"SELECT password FROM User WHERE id = '{user_id}'")[0][0]):
         executes(f"DELETE FROM User WHERE id = {user_id}")
+        executes(f"DELETE FROM Booking WHERE user_id = {user_id}")
         return True
     else:
         return False
@@ -135,72 +143,74 @@ def reset_user_password(user_id: int, created: int,password:str):
     else:
         return False
 
-# Операции для ресурса бронирования аналогичными способами
-
-# Модель данных бронирования пользователя
-class UserBooking(BaseModel):
-    user_id: int
-    start: datetime
-    duration: int
-    comment: Optional[str] = None
-
-
 # Хранилище данных для бронирования пользователя
 user_bookings = []
 users = []
 
 # Операция добавления бронирования для пользователя
-@app.post("/booking/{user_id}/add", response_model=int)
-def create_user_booking(user_id: int, booking: Booking):
-    if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'")) == 0:
+@app.post("/booking/add", response_model=int)
+def create_user_booking(booking: Booking):
+    if booking.user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{booking.user_id}'")) == 0:
         raise HTTPException(status_code=401, detail="User not found")
+    if booking.comment:
+        executes(f"INSERT INTO Booking (user_id, start_time, end_time, comment) VALUES ({booking.user_id}, {booking.start}, {booking.end}, '{booking.comment}');")
+    else:
+        executes(f"INSERT INTO Booking (user_id, start_time, end_time) VALUES ({booking.user_id}, {booking.start}, {booking.end});")
 
-    user_booking = UserBooking(user_id=user, **booking.dict())
-    user_bookings.append(user_booking)
-    return len(user_bookings) - 1
+    return fetchal(f"SELECT id FROM Booking ORDER BY id DESC LIMIT 1;")[0][0]  # Возвращаем индекс созданного пользователя
 
 
 # Операция получения всех бронирований для пользователя
-@app.get("/booking/{user}/getall", response_model=List[UserBooking])
+@app.get("/booking/{user_id}/getall", response_model=List[list])
 def get_all_user_bookings(user_id: int):
-    if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'")) == 0:
-        raise HTTPException(status_code=401, detail="User not found")
-
-    user_bookings_list = [ub for ub in user_bookings if ub.user_id == user]
-    return user_bookings_list
-
+    data = fetchal(f"""
+            SELECT *
+            FROM Booking
+            WHERE user_id == '{user_id}';
+            """)
+    return data
 
 # Операция удаления бронирования для пользователя
-@app.delete("/booking/{user}/{booking_id}/del", response_model=bool)
+@app.delete("/booking/{user_id}/{booking_id}/del", response_model=bool)
 def delete_user_booking(user_id: int, booking_id: int, password: str):
     if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'")) == 0:
         raise HTTPException(status_code=401, detail="User not found")
 
-    if booking_id < 0 or booking_id >= len(user_bookings):
-        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking_id < 0 or len(fetchal(f"SELECT * FROM Booking WHERE id = '{booking_id}'")) == 0:
+        raise HTTPException(status_code=401, detail="Booking not found")
 
-    user_booking = user_bookings[booking_id]
-    if user_booking.user_id == user:
-        user_bookings.pop(booking_id)
+    if chekhex(password, fetchal(f"SELECT password FROM User WHERE id = '{user_id}'")[0][0]):
+        executes(f"DELETE FROM Booking WHERE id = {booking_id}")
         return True
     else:
         return False
 
 
 # Операция обновления бронирования для пользователя
-@app.put("/booking/{user}/{booking_id}/update", response_model=bool)
+@app.put("/booking/{user_id}/{booking_id}/update", response_model=bool)
 def update_user_booking(user_id: int, booking_id: int, booking: Booking, password: str):
     if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'")) == 0:
         raise HTTPException(status_code=401, detail="User not found")
 
-    if booking_id < 0 or booking_id >= len(user_bookings):
-        raise HTTPException(status_code=404, detail="Booking not found")
+    if booking_id < 0 or len(fetchal(f"SELECT * FROM Booking WHERE id = '{booking_id}'")) == 0:
+        raise HTTPException(status_code=401, detail="Booking not found")
 
-    user_booking = user_bookings[booking_id]
-    if user_booking.user_id == user:
-        user_booking.start = booking.start
-        user_booking.duration = booking.duration
-        user_booking.comment = booking.comment
+    if chekhex(password, fetchal(f"SELECT password FROM User WHERE id = '{user_id}'")[0][0]):
+        if booking.comment:
+            executes(f"""
+                    UPDATE Booking
+                    SET start_time = {booking.start},
+                        end_time = {booking.end},
+                        comment = '{booking.comment}'
+                    WHERE id = {booking_id} AND user_id = {user_id};
+                    """)
+        else:
+            executes(f"""
+                    UPDATE Booking
+                    SET start_time = {booking.start},
+                        end_time = {booking.end}
+                    WHERE id = {booking_id} AND user_id = {user_id};
+                    """)
         return True
     else:
         return False

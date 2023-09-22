@@ -14,6 +14,14 @@ class Iser(BaseModel): #Как юзер только с id
 
 # Модель данных бронирования
 class Booking(BaseModel):
-    start: datetime
-    duration: int
+    user_id:int
+    start: int
+    end: int
+    comment: Optional[str] = None
+
+class Booking_Id(BaseModel):
+    id:int
+    user_id:int
+    start: int
+    end: int
     comment: Optional[str] = None
