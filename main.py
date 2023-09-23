@@ -1,25 +1,23 @@
 # 19.09.2023 21:39:45
-# Я Хлеб или же Игорь
-# Хз зачем ты читаешь это... Ты думаешь тут будет важная информация... Возможно...
-# Это стартовый файл, обычно тут ничего нет... Ищи в других файлах!
+# Тут был Хлеб
 
 import sqlite3
 import time
 
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List, Optional
-from datetime import datetime
-from BaseModels import User, Booking, Iser, Booking_Id  # Базовые модели
+from typing import List
+from BaseModels import User, Booking # Базовые модели
 from fastapi.openapi.docs import get_swagger_ui_html
-
+import os
 import bcrypt
-
-import json
+import create_db
 app = FastAPI()
 
 # Создаем подключение к базе данных (файл my_database.db будет создан)
-connection = sqlite3.connect('database.db', check_same_thread=False)
+if os.path.exists('database.db'):
+    connection = sqlite3.connect('database.db', check_same_thread=False)
+else:
+    connection = create_db.create_db('database.db')
 
 @app.get("/docs")
 def read_docs():
@@ -47,13 +45,13 @@ def hex(data:str):
     return data
 
 # Операция создания пользователя (Create)
-@app.post("/user/add", response_model=int)
+@app.post("/user/add", response_model=dict)
 def create_user(user: User)->int:
     if len(fetchal(f"SELECT * FROM User WHERE username = '{user.name}'"))==0:
         executes(f"INSERT INTO User (username, password, created, updated) VALUES ('{user.name}', '{hex(user.password)}', {int(time.time())}, {int(time.time())});")
-        return fetchal(f"SELECT * "
+        return {"user_id":fetchal(f"SELECT * "
                        f"FROM User "
-                       f"WHERE username = {user.name} ;")[0][0]  # Возвращаем индекс созданного пользователя
+                       f"WHERE username = {user.name} ;")[0][0]}  # Возвращаем индекс созданного пользователя
     else:
         raise HTTPException(status_code=409, detail="User already exists")
 
@@ -70,16 +68,15 @@ def check_username(username: str)->bool:
         raise HTTPException(status_code=409, detail="User already exists")
 
 # Операция получения имени и id пользователя (Read)
-@app.post("/user/getname", response_model=int)
+@app.post("/user/getid", response_model=dict)
 def get_user_id_by_name(username: str):
     try:
         id = fetchal(f"""
         SELECT *
         FROM User
         WHERE username = '{username}'
-        LIMIT 1;
         """)[0][0]
-        return id
+        return {"user_id":id}
     except:
         raise HTTPException(status_code=401, detail="User not found")
 
@@ -105,7 +102,7 @@ def delete_user(user_id:int,password: str):
         return False
 
 # Операция получения времени регистрации пользователя (Read)
-@app.get("/user/{user_id}/get_reg_time", response_model=int)
+@app.get("/user/{user_id}/get_reg_time", response_model=dict)
 def get_user_registration_time(user_id: int, password: str):
     if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'")) == 0:
         raise HTTPException(status_code=401, detail="User not found")
@@ -116,7 +113,7 @@ def get_user_registration_time(user_id: int, password: str):
                 FROM User
                 WHERE id = '{user_id}'
                 """)
-        return time[0][0]
+        return {"time_crete":time[0][0]}
     else:
         return -1
 
@@ -143,12 +140,8 @@ def reset_user_password(user_id: int, created: int,password:str):
     else:
         return False
 
-# Хранилище данных для бронирования пользователя
-user_bookings = []
-users = []
-
 # Операция добавления бронирования для пользователя
-@app.post("/booking/add", response_model=int)
+@app.post("/booking/add", response_model=dict)
 def create_user_booking(booking: Booking):
     if booking.user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{booking.user_id}'")) == 0:
         raise HTTPException(status_code=401, detail="User not found")
@@ -157,7 +150,7 @@ def create_user_booking(booking: Booking):
     else:
         executes(f"INSERT INTO Booking (user_id, start_time, end_time) VALUES ({booking.user_id}, {booking.start}, {booking.end});")
 
-    return fetchal(f"SELECT id FROM Booking ORDER BY id DESC LIMIT 1;")[0][0]  # Возвращаем индекс созданного пользователя
+    return {"booking_id":fetchal(f"SELECT id FROM Booking ORDER BY id DESC LIMIT 1;")[0][0]}  # Возвращаем индекс созданного пользователя
 
 
 # Операция получения всех бронирований для пользователя

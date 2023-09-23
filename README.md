@@ -1,41 +1,63 @@
 # CRUD_test_task
 Простой сервис для обработки запросов на бронирование времени. Сервис предоставляет функциональность CRUD
 
+## Оглавление
+1. [Api](#Docs)
+2. [Структура](#Структура-Api)
+
+## requirements
+
++ `bcrypt` ~=4.0.1
++ `fastapi` ~=0.100.0
++ `pydantic` ~=1.10.12
++ `requests` ~=2.28.1
++ `uvicorn` >=0.15.0,<0.16.0
++ `unittest` ~=3.11.5
+
+
+## Установка
+
+Для установки без Docker
+
+```cli
+git clone https://github.com/Igor20264/CRUD_test_task
+cd CRUD_test_task
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Для установки с Docker
+```cli
+git clone https://github.com/Igor20264/CRUD_test_task
+cd CRUD_test_task
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000
+```
 
 ## Docs
-- После запуска в докере, открыть [Ссылку](http://localhost:8000/docs) (http://localhost:8000/docs) для просмотра Api
+- После запуска в докере, открыть [Ссылку](http://localhost:8000/docs) (http://localhost:8000/docs) или [Эту](http://localhost:8000/reboc) (http://localhost:8000/reboc) для просмотра Api.
 
+## Структура Api
 
-## Ниже задача будет разбита на подзадачи, которые вам предстоит выполнить:
-### Основная часть:
-6. Контейнеризация приложения при помощи Docker.
-8. Написание автоматических тестов для созданного функционала.
-9. 
-- Проект содержит Dockerfile для запуска в Docker
-## Критерии оценки
-*Критерии отсортированы по важности при оценивании (по убыванию)*
+- /docs
+- /redoc
 
-1. Получилось ли запустить программу с первого раза по инструкциям в README.md и
-получилось ли воспроизвести результаты
-4. Репозиторий не содержит бинарных артефактов сборки.
-
-## Структура Api (Временное)
 - /user
-	- /get_id_name [<- name] | [-> int (user id)]
-	- /add [<- name, password] | [-> int (user id)]
-	- /getall [-> list (name,user id)]
+	- /add
+  - /checkname
+  - /getid
+	- /getall
 	- /{user_id}
-		- /del [password <-] | [-> bool]
-		- /get_reg_time [password <-] | [-> time (В мс.)]
-		- /reset_password [<- time_create or time_updated] | [->  bool]
+		- /del
+		- /get_reg_time
+		- /reset_password
 
 
 - /booking
-  - /getall [-> list (booking id,user id)]
-  - /{user}
-    - /tall [-> list (booking id)]
-    - /add [start,duration,comment(optional) <-] | [-> id]
+  - /add
+  - /{user_id}
+    - /getall
     - /{booking_id}
-      - /del [password <-] | [-> bool]
-      - /update [password,start,duration,comment(optional) <-] | [-> bool]
+      - /del
+      - /update
 
