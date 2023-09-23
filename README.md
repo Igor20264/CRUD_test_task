@@ -2,8 +2,10 @@
 Простой сервис для обработки запросов на бронирование времени. Сервис предоставляет функциональность CRUD
 
 ## Оглавление
-1. [Api](#Docs)
-2. [Структура](#Структура-Api)
+1. [Установка](#Установка)
+2. [Api](#Docs)
+3. [Структура](#Структура-Api)
+4. [А как работает](#примеры-запросов)
 
 ## requirements
 
@@ -29,9 +31,8 @@ uvicorn main:app --host 0.0.0.0 --port 8000
 Для установки с Docker
 ```cli
 git clone https://github.com/Igor20264/CRUD_test_task
-cd CRUD_test_task
-pip install -r requirements.txt
-uvicorn main:app --host 0.0.0.0 --port 8000
+docker build -t crud_test CRUD_test_task
+docker run crud_test
 ```
 
 ## Docs
@@ -61,3 +62,24 @@ uvicorn main:app --host 0.0.0.0 --port 8000
       - /del
       - /update
 
+## Примеры запросов
+
+### Создание пользователя
+```
+data = requests.post("http://localhost:8000/user/add",json.dumps({"name":"Gleb","password":"123321!"})).json()
+data = {"user_id": INT}
+```
+
+### Получение всех пользователей
+```
+data = requests.get("http://localhost:8000/user/getall")
+data = [[name,id],[name,id],...]
+```
+
+### Удаление записи
+```
+data = requests.delete(f"http://localhost:8000/booking/{id:int}/{book_id:int}/del?password={password:str}")
+data = bool
+```
+### Больше примеров
+Больше примеров можно найти в [Файле](test.py)
