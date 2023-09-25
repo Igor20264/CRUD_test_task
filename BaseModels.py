@@ -7,7 +7,7 @@ class User(BaseModel):
     name: str
     password: str
 
-class Iser(BaseModel): #Как юзер только с id
+class UserId(User): #Как юзер только с id
     id:int
     password:str
 
@@ -18,7 +18,8 @@ class Booking(BaseModel):
     end: int
     comment: Optional[str] = None
 
-class Booking_Id(BaseModel):
+
+class BookingId(Booking):
     id:int
     user_id:int
     start: int
