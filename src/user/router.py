@@ -1,95 +1,68 @@
-from fastapi import APIRouter
+from typing import List
+from fastapi import APIRouter, HTTPException
+from user.models import UserId, User, UserReset,NewPassword,NewName
+import edgedb
 
-
+from queries import create_user_async_edgeql as create_user
+from queries import chek_user_async_edgeql as chek_user
+from queries import delete_user_async_edgeql as delete_user
+from queries import get_id_async_edgeql as get_id_async
+from queries import get_reg_time_async_edgeql as get_reg_time
+from queries import get_users_async_edgeql as get_users
+from queries import reset_password_async_edgeql as reset_password
+from queries import reset_username_async_edgeql as reset_username
+from user.utils import create_hash,password_cheker
 router = APIRouter(
     prefix="/user",
     tags=["User"]
 )
+client = edgedb.create_async_client()
 
-@router.post("/user", response_model=dict)
-def create_user(user: User):
-    if len(fetchal(f"SELECT * FROM User WHERE username = '{user.name}'"))==0:
-        executes(f"INSERT INTO User (username, password, created, updated) VALUES ('{user.name}', '{hex(user.password)}', {int(time.time())}, {int(time.time())});")
-        return {"user_id":fetchal(f"SELECT * FROM User WHERE username = {user.name} ;")[0][0]}  # Возвращаем индекс созданного пользователя
-    raise HTTPException(status_code=409, detail="User already exists")
+@router.post("/", response_model=create_user.CreateUserResult)
+async def new_user(user: User):
+    try:
+        s = await create_user.create_user(client,username=user.name,password=create_hash(user.password))
+        return s
+    except edgedb.errors.ConstraintViolationError:
+        raise HTTPException(status_code=409, detail="User already exists")
+
 
 # Операция проверки занятости имени пользователя (Read)
-@router.get("/user/checkname", response_model=bool)
-def check_username(username: str)->bool:
-    if len(fetchal(f"""
-    SELECT *
-    FROM User
-    WHERE username = '{username}'
-    """))==0:
-        return True
-    raise HTTPException(status_code=409, detail="User already exists")
+@router.get("/checkname", response_model=bool)
+async def check_username(username: str) -> bool:
+    return await chek_user.chek_user(client,username=username)
+    # raise HTTPException(status_code=409, detail="User already exists")
 
-# Операция получения имени и id пользователя (Read)
-@router.get("/user/id", response_model=dict)
-def get_user_id_by_name(username: str):
-    try:
-        id = fetchal(f"""
-        SELECT *
-        FROM User
-        WHERE username = '{username}'
-        """)[0][0]
-        return {"user_id":id}
-    except Exception as error:
-        raise HTTPException(status_code=401, detail="User not found")
 
 # Операция получения всех пользователей (Read All)
-@router.get("/user/all", response_model=List[tuple])
-def get_all_users():
-    return fetchal(f"""
-        SELECT username,id
-        FROM User;
-        """)
+@router.get("/all", response_model=list[get_users.GetUsersResult])
+async def get_all_users():
+    return await get_users.get_users(client)
 
-# Операция удаления пользователя (Delete) Хз можно ли, так делать... Но это удаление...
-@router.delete("/user", response_model=bool)
-def delete_user(user_id:int,password: str):
-    if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'"))==0:
-        raise HTTPException(status_code=401, detail="User not found")
 
-    if chekhex(password,fetchal(f"SELECT password FROM User WHERE id = '{user_id}'")[0][0]):
-        executes(f"DELETE FROM User WHERE id = {user_id}")
-        executes(f"DELETE FROM Booking WHERE user_id = {user_id}")
-        return True
-    return False
+@router.delete("/", response_model=delete_user.DeleteUserResult)
+async def delete_user(user: UserId):
+    if await password_cheker(client, user.name):
+        return await delete_user.delete_user(client,id=UserId,name=UserId.name)
+    raise HTTPException(status_code=403, detail="Password is not corrected")
 
 # Операция получения времени регистрации пользователя (Read)
-@router.get("/user/reg_time", response_model=dict)
-def get_user_registration_time(user: UserId):
-    if user.id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user.id}'")) == 0:
-        raise HTTPException(status_code=401, detail="User not found")
+@router.get("/reg_time", response_model=get_reg_time.GetRegTimeResult)
+async def get_user_registration_time(user: UserId):
+    if await password_cheker(client, user.name):
+        return await get_reg_time.get_reg_time(client,id=user.id, username=user.name)
+    raise HTTPException(status_code=403, detail="Password is not corrected")
 
-    if chekhex(user.password,fetchal(f"SELECT password FROM User WHERE id = '{user.id}'")[0][0]):
-        time = fetchal(f"""
-                SELECT created
-                FROM User
-                WHERE id = '{user.id}'
-                """)
-        return {"time_crete":time[0][0]}
-    return -1
 
 # Операция сброса пароля пользователя (Update)
-@router.put("/user/{user_id}/reset_password", response_model=bool)
-def reset_user_password(user_id: int, created: int,password:str):
-    if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'")) == 0:
-        raise HTTPException(status_code=401, detail="User not found")
+@router.put("/password", response_model=reset_password.ResetPasswordResult)
+async def reset_user_password(user: NewPassword):
+    return await reset_password.reset_password(client,id=user.id,username=user.name,created=user.created,password=user.newpassword)
 
-    ttime = int(fetchal(f"""
-                    SELECT created
-                    FROM User
-                    WHERE id = '{user_id}'
-                    """)[0][0])
-    # Проверяем, что время создания пользователя не превышает указанное время
-    if ttime == created:
-        executes(f"""
-        UPDATE User
-        SET password = '{hex(password)}',
-            updated = {int(time.time())}
-        WHERE id = {user_id};
-        """)
-        return True
-    return False
+
+# Операция сброса пароля пользователя (Update)
+@router.put("/name", response_model=reset_username.ResetUsernameResult)
+async def reset_user_password(user: NewName):
+    if await password_cheker(client, user.name):
+        return await reset_username.reset_username(client,id=user.id,username=user.newname)
+    raise HTTPException(status_code=403, detail="Password is not corrected")
