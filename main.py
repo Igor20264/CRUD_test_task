@@ -6,51 +6,31 @@ import time
 from logging import log
 
 from fastapi import FastAPI, HTTPException
-from typing import List
+from typing import List, Dict, Any
 from BaseModels import User, Booking, UserId, BookingId  # Базовые модели
 from fastapi.openapi.docs import get_swagger_ui_html
 import os
 import bcrypt
 import create_db
+
 app = FastAPI()
-
-# Создаем подключение к базе данных (файл my_database.db будет создан)
-if os.path.exists('database.db'):
-    connection = sqlite3.connect('database.db', check_same_thread=False)
-else:
-    connection = create_db.create_db('database.db')
-
-def executes(text):
-    cursor = connection.cursor()
-    cursor.execute(text)
-    connection.commit()
-    return True
-
-def fetchal(text):
-    cursor = connection.cursor()
-    cursor.execute(text)
-    results = cursor.fetchall()
-    return results
 
 def chekhex(data,hash):
     if bcrypt.checkpw(bytes(data, 'utf-8'), bytes(hash, 'utf-8')):
         return True
-    else: return False
+    return False
 
-def hex(data:str):
+def tohex(data:str):
     data = bcrypt.hashpw(bytes(data, 'utf-8'), bcrypt.gensalt()).decode("utf-8")
     return data
 
 # Операция создания пользователя (Create)
 @app.post("/user", response_model=dict)
-def create_user(user: User)->int:
+def create_user(user: User):
     if len(fetchal(f"SELECT * FROM User WHERE username = '{user.name}'"))==0:
         executes(f"INSERT INTO User (username, password, created, updated) VALUES ('{user.name}', '{hex(user.password)}', {int(time.time())}, {int(time.time())});")
-        return {"user_id":fetchal(f"SELECT * "
-                       f"FROM User "
-                       f"WHERE username = {user.name} ;")[0][0]}  # Возвращаем индекс созданного пользователя
-    else:
-        raise HTTPException(status_code=409, detail="User already exists")
+        return {"user_id":fetchal(f"SELECT * FROM User WHERE username = {user.name} ;")[0][0]}  # Возвращаем индекс созданного пользователя
+    raise HTTPException(status_code=409, detail="User already exists")
 
 # Операция проверки занятости имени пользователя (Read)
 @app.get("/user/checkname", response_model=bool)
@@ -61,8 +41,7 @@ def check_username(username: str)->bool:
     WHERE username = '{username}'
     """))==0:
         return True
-    else:
-        raise HTTPException(status_code=409, detail="User already exists")
+    raise HTTPException(status_code=409, detail="User already exists")
 
 # Операция получения имени и id пользователя (Read)
 @app.get("/user/id", response_model=dict)
@@ -75,7 +54,6 @@ def get_user_id_by_name(username: str):
         """)[0][0]
         return {"user_id":id}
     except Exception as error:
-        log(error)
         raise HTTPException(status_code=401, detail="User not found")
 
 # Операция получения всех пользователей (Read All)
@@ -96,8 +74,7 @@ def delete_user(user_id:int,password: str):
         executes(f"DELETE FROM User WHERE id = {user_id}")
         executes(f"DELETE FROM Booking WHERE user_id = {user_id}")
         return True
-    else:
-        return False
+    return False
 
 # Операция получения времени регистрации пользователя (Read)
 @app.get("/user/reg_time", response_model=dict)
@@ -112,8 +89,7 @@ def get_user_registration_time(user: UserId):
                 WHERE id = '{user.id}'
                 """)
         return {"time_crete":time[0][0]}
-    else:
-        return -1
+    return -1
 
 # Операция сброса пароля пользователя (Update)
 @app.put("/user/{user_id}/reset_password", response_model=bool)
@@ -135,8 +111,7 @@ def reset_user_password(user_id: int, created: int,password:str):
         WHERE id = {user_id};
         """)
         return True
-    else:
-        return False
+    return False
 
 # Операция добавления бронирования для пользователя
 @app.post("/booking", response_model=dict)
@@ -173,8 +148,7 @@ def delete_user_booking(user:UserId, booking_id: int):
     if chekhex(user.password, fetchal(f"SELECT password FROM User WHERE id = '{user.id}'")[0][0]):
         executes(f"DELETE FROM Booking WHERE id = {booking_id}")
         return True
-    else:
-        return False
+    return False
 
 
 # Операция обновления бронирования для пользователя
@@ -203,8 +177,7 @@ def update_user_booking(user:UserId, booking: BookingId):
                     WHERE id = {booking.id} AND user_id = {user.id};
                     """)
         return True
-    else:
-        return False
+    return False
 
 @app.on_event("shutdown")
 async def shutdown():
