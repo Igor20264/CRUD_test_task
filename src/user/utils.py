@@ -1,6 +1,6 @@
 import bcrypt
 import edgedb
-from queries import get_password_async_edgeql as get_password
+from src.queries import get_password_async_edgeql as get_password
 
 
 async def password_cheker(executor: edgedb.AsyncIOExecutor, username: str):

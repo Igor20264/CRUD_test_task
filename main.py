@@ -6,13 +6,10 @@
 
 from fastapi import FastAPI
 
-from user.router import router as router_user
-from booking.router import router as router_booking
+from src.user.router import router as router_user
+from src.booking.router import router as router_booking
+
 app = FastAPI()
-
-@app.on_event("shutdown")
-async def shutdown():
-    pass
-
+print("DSSSD")
 app.include_router(router_user)
 app.include_router(router_booking)

@@ -1,17 +1,17 @@
 from typing import List
 from fastapi import APIRouter, HTTPException
-from user.models import UserId, User, UserReset,NewPassword,NewName
+from src.user.models import UserId, User, UserReset,NewPassword,NewName
 import edgedb
 
-from queries import create_user_async_edgeql as create_user
-from queries import chek_user_async_edgeql as chek_user
-from queries import delete_user_async_edgeql as delete_user
-from queries import get_id_async_edgeql as get_id_async
-from queries import get_reg_time_async_edgeql as get_reg_time
-from queries import get_users_async_edgeql as get_users
-from queries import reset_password_async_edgeql as reset_password
-from queries import reset_username_async_edgeql as reset_username
-from user.utils import create_hash,password_cheker
+from src.queries import create_user_async_edgeql as create_user
+from src.queries import chek_user_async_edgeql as chek_user
+from src.queries import delete_user_async_edgeql as delete_user
+from src.queries import get_id_async_edgeql as get_id_async
+from src.queries import get_reg_time_async_edgeql as get_reg_time
+from src.queries import get_users_async_edgeql as get_users
+from src.queries import reset_password_async_edgeql as reset_password
+from src.queries import reset_username_async_edgeql as reset_username
+from src.user.utils import create_hash,password_cheker
 router = APIRouter(
     prefix="/user",
     tags=["User"]

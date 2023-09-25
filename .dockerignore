@@ -1,0 +1,6 @@
+venv
+README.md
+test.py
+docker-compose.yml
+Dockerfile
+*.edgeql

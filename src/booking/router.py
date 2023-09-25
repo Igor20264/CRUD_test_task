@@ -1,7 +1,7 @@
 from typing import List
 from fastapi import APIRouter, HTTPException
-from booking.models import Booking, BookingId
-from user.models import UserId, User, UserReset
+from src.booking.models import Booking, BookingId
+from src.user.models import UserId, User, UserReset
 
 
 router = APIRouter(
