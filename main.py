@@ -3,10 +3,11 @@
 
 import sqlite3
 import time
+from logging import log
 
 from fastapi import FastAPI, HTTPException
 from typing import List
-from BaseModels import User, Booking # Базовые модели
+from BaseModels import User, Booking, UserId, BookingId  # Базовые модели
 from fastapi.openapi.docs import get_swagger_ui_html
 import os
 import bcrypt
@@ -18,10 +19,6 @@ if os.path.exists('database.db'):
     connection = sqlite3.connect('database.db', check_same_thread=False)
 else:
     connection = create_db.create_db('database.db')
-
-@app.get("/docs")
-def read_docs():
-    return get_swagger_ui_html(openapi_url="/openapi.json")
 
 def executes(text):
     cursor = connection.cursor()
@@ -45,7 +42,7 @@ def hex(data:str):
     return data
 
 # Операция создания пользователя (Create)
-@app.post("/user/add", response_model=dict)
+@app.post("/user", response_model=dict)
 def create_user(user: User)->int:
     if len(fetchal(f"SELECT * FROM User WHERE username = '{user.name}'"))==0:
         executes(f"INSERT INTO User (username, password, created, updated) VALUES ('{user.name}', '{hex(user.password)}', {int(time.time())}, {int(time.time())});")
@@ -56,7 +53,7 @@ def create_user(user: User)->int:
         raise HTTPException(status_code=409, detail="User already exists")
 
 # Операция проверки занятости имени пользователя (Read)
-@app.post("/user/checkname", response_model=bool)
+@app.get("/user/checkname", response_model=bool)
 def check_username(username: str)->bool:
     if len(fetchal(f"""
     SELECT *
@@ -68,7 +65,7 @@ def check_username(username: str)->bool:
         raise HTTPException(status_code=409, detail="User already exists")
 
 # Операция получения имени и id пользователя (Read)
-@app.post("/user/getid", response_model=dict)
+@app.get("/user/id", response_model=dict)
 def get_user_id_by_name(username: str):
     try:
         id = fetchal(f"""
@@ -77,11 +74,12 @@ def get_user_id_by_name(username: str):
         WHERE username = '{username}'
         """)[0][0]
         return {"user_id":id}
-    except:
+    except Exception as error:
+        log(error)
         raise HTTPException(status_code=401, detail="User not found")
 
 # Операция получения всех пользователей (Read All)
-@app.get("/user/getall", response_model=List[tuple])
+@app.get("/user/all", response_model=List[tuple])
 def get_all_users():
     return fetchal(f"""
         SELECT username,id
@@ -89,7 +87,7 @@ def get_all_users():
         """)
 
 # Операция удаления пользователя (Delete) Хз можно ли, так делать... Но это удаление...
-@app.delete("/user/{user_id}/del", response_model=bool)
+@app.delete("/user", response_model=bool)
 def delete_user(user_id:int,password: str):
     if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'"))==0:
         raise HTTPException(status_code=401, detail="User not found")
@@ -102,16 +100,16 @@ def delete_user(user_id:int,password: str):
         return False
 
 # Операция получения времени регистрации пользователя (Read)
-@app.get("/user/{user_id}/get_reg_time", response_model=dict)
-def get_user_registration_time(user_id: int, password: str):
-    if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'")) == 0:
+@app.get("/user/reg_time", response_model=dict)
+def get_user_registration_time(user: UserId):
+    if user.id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user.id}'")) == 0:
         raise HTTPException(status_code=401, detail="User not found")
 
-    if chekhex(password,fetchal(f"SELECT password FROM User WHERE id = '{user_id}'")[0][0]):
+    if chekhex(user.password,fetchal(f"SELECT password FROM User WHERE id = '{user.id}'")[0][0]):
         time = fetchal(f"""
                 SELECT created
                 FROM User
-                WHERE id = '{user_id}'
+                WHERE id = '{user.id}'
                 """)
         return {"time_crete":time[0][0]}
     else:
@@ -141,7 +139,7 @@ def reset_user_password(user_id: int, created: int,password:str):
         return False
 
 # Операция добавления бронирования для пользователя
-@app.post("/booking/add", response_model=dict)
+@app.post("/booking", response_model=dict)
 def create_user_booking(booking: Booking):
     if booking.user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{booking.user_id}'")) == 0:
         raise HTTPException(status_code=401, detail="User not found")
@@ -154,7 +152,7 @@ def create_user_booking(booking: Booking):
 
 
 # Операция получения всех бронирований для пользователя
-@app.get("/booking/{user_id}/getall", response_model=List[list])
+@app.get("/booking/{user_id}/all", response_model=List[list])
 def get_all_user_bookings(user_id: int):
     data = fetchal(f"""
             SELECT *
@@ -164,15 +162,15 @@ def get_all_user_bookings(user_id: int):
     return data
 
 # Операция удаления бронирования для пользователя
-@app.delete("/booking/{user_id}/{booking_id}/del", response_model=bool)
-def delete_user_booking(user_id: int, booking_id: int, password: str):
-    if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'")) == 0:
+@app.delete("/booking/", response_model=bool)
+def delete_user_booking(user:UserId, booking_id: int):
+    if user.id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user.id}'")) == 0:
         raise HTTPException(status_code=401, detail="User not found")
 
     if booking_id < 0 or len(fetchal(f"SELECT * FROM Booking WHERE id = '{booking_id}'")) == 0:
         raise HTTPException(status_code=401, detail="Booking not found")
 
-    if chekhex(password, fetchal(f"SELECT password FROM User WHERE id = '{user_id}'")[0][0]):
+    if chekhex(user.password, fetchal(f"SELECT password FROM User WHERE id = '{user.id}'")[0][0]):
         executes(f"DELETE FROM Booking WHERE id = {booking_id}")
         return True
     else:
@@ -180,29 +178,29 @@ def delete_user_booking(user_id: int, booking_id: int, password: str):
 
 
 # Операция обновления бронирования для пользователя
-@app.put("/booking/{user_id}/{booking_id}/update", response_model=bool)
-def update_user_booking(user_id: int, booking_id: int, booking: Booking, password: str):
-    if user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user_id}'")) == 0:
+@app.put("/booking/", response_model=bool)
+def update_user_booking(user:UserId, booking: BookingId):
+    if user.id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user.id}'")) == 0:
         raise HTTPException(status_code=401, detail="User not found")
 
-    if booking_id < 0 or len(fetchal(f"SELECT * FROM Booking WHERE id = '{booking_id}'")) == 0:
+    if booking.id < 0 or len(fetchal(f"SELECT * FROM Booking WHERE id = '{booking.id}'")) == 0:
         raise HTTPException(status_code=401, detail="Booking not found")
 
-    if chekhex(password, fetchal(f"SELECT password FROM User WHERE id = '{user_id}'")[0][0]):
+    if chekhex(user.password, fetchal(f"SELECT password FROM User WHERE id = '{user.id}'")[0][0]):
         if booking.comment:
             executes(f"""
                     UPDATE Booking
                     SET start_time = {booking.start},
                         end_time = {booking.end},
                         comment = '{booking.comment}'
-                    WHERE id = {booking_id} AND user_id = {user_id};
+                    WHERE id = {booking.id} AND user_id = {user.id};
                     """)
         else:
             executes(f"""
                     UPDATE Booking
                     SET start_time = {booking.start},
                         end_time = {booking.end}
-                    WHERE id = {booking_id} AND user_id = {user_id};
+                    WHERE id = {booking.id} AND user_id = {user.id};
                     """)
         return True
     else:
