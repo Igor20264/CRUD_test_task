@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from src.booking.models import Booking, BookingId
 from src.user.models import UserId, User, UserReset
 
+client = edgedb.create_async_client()
 
 router = APIRouter(
     prefix="/booking",
