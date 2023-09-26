@@ -9,7 +9,7 @@ class User(BaseModel):
     password: str
 
 class UserId(User):
-    id: uuid.UUID
+    id: str
 
 class UserReset(UserId):
     created: datetime.datetime
@@ -20,5 +20,5 @@ class NewPassword(UserReset):
 class NewName(UserReset):
     newname: str
 class DataUser(BaseModel):
-    id: uuid.UUID
+    id: str
     name: str
