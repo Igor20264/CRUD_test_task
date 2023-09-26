@@ -26,12 +26,12 @@ class GetPasswordResult(NoPydanticValidation):
 async def get_password(
     executor: edgedb.AsyncIOExecutor,
     *,
-    username: str,
+    id: uuid.UUID,
 ) -> GetPasswordResult | None:
     return await executor.query_single(
         """\
         select User {password}
-        filter User.username = <str>$username\
+        filter User.id = <uuid>$id\
         """,
-        username=username,
+        id=id,
     )
