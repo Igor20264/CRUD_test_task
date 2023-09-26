@@ -39,7 +39,6 @@ async def get_all_users():
 async def user_delete(user: UserId):
     if await password_cheker(client,user.password, uuid.UUID(user.id)):
         data = await delete_user.delete_user(client,id=uuid.UUID(user.id),name=user.name)
-        print(data)
         return bool(data)
     raise HTTPException(status_code=403, detail="Password is not corrected")
 
