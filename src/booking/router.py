@@ -1,76 +1,53 @@
+import uuid
 from typing import List
+
+import edgedb.errors
 from fastapi import APIRouter, HTTPException
 from src.booking.models import Booking, BookingId
 from src.user.models import UserId, User, UserReset
+from queries import create_booking_async_edgeql as cb
+from queries import create_booking_comment_async_edgeql as cbc
+from queries import delete_booking_async_edgeql as db
+from queries import get_all_booking_async_edgeql as get_all
+from queries import get_all_user_booking_async_edgeql as get_all_user
+from queries import update_booking_async_edgeql as updatebooking
+from src.user.utils import password_cheker
 
+client = edgedb.create_async_client()
 
 router = APIRouter(
     prefix="/booking",
     tags=["Booking"]
 )
 
-# Операция добавления бронирования для пользователя
-@router.post("/", response_model=dict)
-async def create_user_booking(booking: Booking):
-    if booking.user_id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{booking.user_id}'")) == 0:
-        raise HTTPException(status_code=401, detail="User not found")
+
+@router.post("/", response_model=cb.CreateBookingResult)
+async def create_user_booking(booking: Booking,user_id: uuid.UUID):
     if booking.comment:
-        executes(f"INSERT INTO Booking (user_id, start_time, end_time, comment) VALUES ({booking.user_id}, {booking.start}, {booking.end}, '{booking.comment}');")
+        s = await cbc.create_booking_comment(client,id=user_id,start=booking.start,end=booking.end,comment=booking.comment)
     else:
-        executes(f"INSERT INTO Booking (user_id, start_time, end_time) VALUES ({booking.user_id}, {booking.start}, {booking.end});")
+        s = await cb.create_booking(client, id=booking.id, start=booking.start, end=booking.end)
+    return s
 
-    return {"booking_id":fetchal(f"SELECT id FROM Booking ORDER BY id DESC LIMIT 1;")[0][0]}  # Возвращаем индекс созданного пользователя
+
+@router.get("/all", response_model=list[get_all.GetAllBookingResult])
+async def get_all_user_bookings():
+    return await get_all.get_all_booking(client)
 
 
-# Операция получения всех бронирований для пользователя
-@router.get("/all", response_model=List[list])
-async def get_all_user_bookings(user_id: int):
-    data = fetchal(f"""
-            SELECT *
-            FROM Booking
-            WHERE user_id == '{user_id}';
-            """)
-    return data
+@router.get("/all", response_model=List[get_all_user.GetAllUserBookingResult])
+async def get_all_user_bookings(user_id: uuid.UUID):
+    return await get_all_user.get_all_user_booking(client,user_id=user_id)
 
-# Операция удаления бронирования для пользователя
-@router.delete("/", response_model=bool)
-async def delete_user_booking(user:UserId, booking_id: int):
-    if user.id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user.id}'")) == 0:
-        raise HTTPException(status_code=401, detail="User not found")
-
-    if booking_id < 0 or len(fetchal(f"SELECT * FROM Booking WHERE id = '{booking_id}'")) == 0:
-        raise HTTPException(status_code=401, detail="Booking not found")
-
-    if chekhex(user.password, fetchal(f"SELECT password FROM User WHERE id = '{user.id}'")[0][0]):
-        executes(f"DELETE FROM Booking WHERE id = {booking_id}")
-        return True
-    return False
-
+@router.delete("/", response_model=db.DeleteBookingResult)
+async def delete_user_booking(user:UserId, booking_id: uuid.UUID):
+    if await password_cheker(client, user.password, user.id):
+        return await db.delete_booking(client,id=booking_id, user_id=user.id)
+    raise HTTPException(status_code=403, detail="Password is not corrected")
 
 # Операция обновления бронирования для пользователя
 @router.put("/", response_model=bool)
 async def update_user_booking(user:UserId, booking: BookingId):
-    if user.id < 0 or len(fetchal(f"SELECT * FROM User WHERE id = '{user.id}'")) == 0:
-        raise HTTPException(status_code=401, detail="User not found")
-
-    if booking.id < 0 or len(fetchal(f"SELECT * FROM Booking WHERE id = '{booking.id}'")) == 0:
-        raise HTTPException(status_code=401, detail="Booking not found")
-
-    if chekhex(user.password, fetchal(f"SELECT password FROM User WHERE id = '{user.id}'")[0][0]):
-        if booking.comment:
-            executes(f"""
-                    UPDATE Booking
-                    SET start_time = {booking.start},
-                        end_time = {booking.end},
-                        comment = '{booking.comment}'
-                    WHERE id = {booking.id} AND user_id = {user.id};
-                    """)
-        else:
-            executes(f"""
-                    UPDATE Booking
-                    SET start_time = {booking.start},
-                        end_time = {booking.end}
-                    WHERE id = {booking.id} AND user_id = {user.id};
-                    """)
-        return True
-    return False
+    if await password_cheker(client, user.password, user.id):
+        return await updatebooking.update_booking(client,id=booking.id,comment=booking.comment,end=booking.end,start=booking.start)
+    raise HTTPException(status_code=403, detail="Password is not corrected")

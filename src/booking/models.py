@@ -1,11 +1,12 @@
+import datetime
+
 from pydantic import BaseModel
 from typing import Optional
-
+from uuid import UUID
 class Booking(BaseModel):
-    user_id:int
-    start: int
-    end: int
+    start: datetime.datetime
+    end: datetime.datetime
     comment: Optional[str] = None
 
 class BookingId(Booking):
-    id:int
+    id: UUID

@@ -14,7 +14,7 @@ module default {
     }
 
     type Booking {
-        required user_id -> User;
+        required user_id: User;
         required start_time: datetime;
         required end_time: datetime;
         comment: str;
